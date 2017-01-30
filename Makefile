@@ -1,6 +1,7 @@
 include config.mk
 
 clib := lem/mbedtls/core.so
+llib := lem/mbedtls.lua
 
 mbedtls_lib = mbedtls/library/libmbedcrypto.a \
 						  mbedtls/library/libmbedx509.a \
@@ -22,10 +23,9 @@ $(clib): lem/mbedtls/core.c $(mbedtls_lib)
 	$(CC) $(CFLAGS) $< $(LDFLAGS) \
 	 -o $@ 
 
-hiredis/async.c:
-
-install: $(clib)
-	install -m 644 $< $(cmoddir)/lem
+install: $(clib) $(llib)
+	install -D -m 644 $< $(cmoddir)/$(clib)
+	install -D -m 644 $< $(lmoddir)/$(llib)
 
 #.PHONY: test
 #test:
