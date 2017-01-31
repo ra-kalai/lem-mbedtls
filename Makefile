@@ -24,8 +24,8 @@ $(clib): lem/mbedtls/core.c $(mbedtls_lib)
 	 -o $@ 
 
 install: $(clib) $(llib)
-	install -D -m 644 $< $(cmoddir)/$(clib)
-	install -D -m 644 $< $(lmoddir)/$(llib)
+	install -D -m 644 $(clib) $(cmoddir)/$(clib)
+	install -D -m 644 $(llib) $(lmoddir)/$(llib)
 
 #.PHONY: test
 #test:

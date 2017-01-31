@@ -340,7 +340,6 @@ int lem_mbedtls_new_conf(lua_State *T) {
 
 int lem_mbedtls_ssl_context_gc(lua_State *L) {
   struct mbedtls_ssl_context *ssl = (mbedtls_ssl_context*) lua_touserdata(L, 1);
-  printf("context gc->%p\n", ssl);
   mbedtls_ssl_free(ssl);
 
   return 0;

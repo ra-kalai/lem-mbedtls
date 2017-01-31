@@ -95,16 +95,16 @@ function wrapped_socket_mt:getpeer(...)
 end
 
 function wrapped_socket_mt:close()
-  self:ssl_close()
+  return self:ssl_close()
 end
 
 function wrapped_socket_mt:__gc()
-  self:ssl_close()
+  return self:ssl_close()
 end
 
 function wrapped_socket_mt:ssl_close()
   if self.ssl_closed == true then
-    return
+    return true
   end
 
   utils.yield()
@@ -126,9 +126,10 @@ function wrapped_socket_mt:ssl_close()
   local free_context_list = self.ssl_config.free_context_list
   self.ssl_context:reset()
   free_context_list[#free_context_list + 1] = self.ssl_context
+  return true
 end
 
-function tls_config_mt:ssl_tcp_connect(host, port)
+function tls_config_mt:tcp_connect(host, port)
   local socket, err = tcp_connect(host, port)
 
   if socket then
@@ -137,6 +138,8 @@ function tls_config_mt:ssl_tcp_connect(host, port)
 
   return nil, err
 end
+
+tls_config_mt.connect = tls_config_mt.tcp_connect
 
 function tls_config_mt:ssl_wrap_socket(socket, hostname)
   local ssl
