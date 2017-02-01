@@ -394,6 +394,7 @@ struct lem_mbedtls_sock_forward {
 #define NOTHING                0
 #define IDLE_CLOSE             1
 #define IDLE_REARM_SSL_WATCHER 2
+#define IDLE_REARM_UNIX_WATCHER 4
 
 struct lem_mbedtls_ssl_wrap_socket_task {
   struct lem_async a;
@@ -420,7 +421,7 @@ static void idle_stop_sock_forwarding(EV_P_ ev_idle *w, int revent) {
       return ;
     } else  {
       int idle_binded = 0;
-      if (event->status == IDLE_REARM_SSL_WATCHER) {
+      if (event->status&(IDLE_REARM_SSL_WATCHER|IDLE_REARM_UNIX_WATCHER)) {
         if (ev_is_active(w)) {
           ev_set_cb(w, idle_stop_sock_forwarding);
           idle_binded = 1;
@@ -455,7 +456,7 @@ static void unix_write_cb(EV_P_ ev_io *w, int revents) {
 
   (void)revents;
 
-  if (event->status) return ;
+  if (event->status == IDLE_CLOSE) return ;
 
   if (event->s_rlen == 0) {
     ev_io_stop(EV_A_ w);
@@ -471,7 +472,6 @@ static void unix_write_cb(EV_P_ ev_io *w, int revents) {
   }
 
   if (ret <= 0) {
-    puts("uwrite close");
     idle_stop_sock_forwarding(EV_A_ &event->idle, EV_CLEANUP);
     return ;
   }
@@ -498,6 +498,18 @@ static void idle_restart_rssl_watcher(EV_P_ ev_idle *w, int revent) {
   event->status = NOTHING;
 }
 
+static void idle_restart_unix_watcher(EV_P_ ev_idle *w, int revent) {
+  struct lem_mbedtls_sock_forward *event =
+    get_parent_struct(struct lem_mbedtls_sock_forward, idle, w);
+  (void) revent;
+
+  if (event->status != IDLE_REARM_UNIX_WATCHER) return ;
+
+  ev_idle_stop(EV_A_ w);
+  ev_io_start(EV_A_ &event->runix);
+  event->status = NOTHING;
+}
+
 static void ssl_forward_cb(EV_P_ ev_io *w, int revents) {
   int ret;
   int len;
@@ -505,7 +517,7 @@ static void ssl_forward_cb(EV_P_ ev_io *w, int revents) {
     get_parent_struct(struct lem_mbedtls_sock_forward, rssl, w);
   (void)revents;
 
-  if (event->status) return ;
+  if (event->status == IDLE_CLOSE) return ;
 
   do {
     len = sizeof(event->s_rbuf) - event->s_rlen;
@@ -548,7 +560,7 @@ static void ssl_write_cb(EV_P_ ev_io *w, int revents) {
 
   (void)revents;
 
-  if (event->status) return ;
+  if (event->status == IDLE_CLOSE) return ;
 
   if (event->u_rlen == 0) {
     ev_io_stop(EV_A_ w);
@@ -584,12 +596,19 @@ static void unix_forward_cb(EV_P_ ev_io *w, int revents) {
 
   (void)revents;
 
-  if (event->status) return ;
+  if (event->status == IDLE_CLOSE) return ;
 
   do {
     len = sizeof(event->u_rbuf) - event->u_rlen;
 
-    if (len <= 0) return ;
+    if (len <= 0) {
+      event->status = IDLE_REARM_UNIX_WATCHER;
+      ev_idle_init(&event->idle, idle_restart_unix_watcher);
+      ev_idle_start(EV_A_ &event->idle);
+      ev_io_stop(EV_A_ w);
+      return ;
+    }
+
 
     ret = read(w->fd, event->u_rbuf, len);
 

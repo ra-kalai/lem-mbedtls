@@ -99,6 +99,7 @@ function wrapped_socket_mt:close()
 end
 
 function wrapped_socket_mt:__gc()
+  self.gc = 1
   return self:ssl_close()
 end
 
@@ -107,7 +108,9 @@ function wrapped_socket_mt:ssl_close()
     return true
   end
 
-  utils.yield()
+  if self.gc == nil then
+    utils.yield()
+  end
 
   -- after a sock:write(), we need to yield to make sure data get sent,
   -- we then can close the socks
