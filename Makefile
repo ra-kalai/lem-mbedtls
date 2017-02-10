@@ -13,7 +13,7 @@ mbedtls/include/mbedtls/config.h:
 	git submodule init
 	git submodule update
 
-mbedtls/library/libmbedcrypto.a:
+mbedtls/library/libmbedcrypto.a: mbedtls/include/mbedtls/config.h
 	sed 's|//#define MBEDTLS_THREADING_C|#define MBEDTLS_THREADING_C|g;s|//#define MBEDTLS_THREADING_PTHREAD|#define MBEDTLS_THREADING_PTHREAD|g' mbedtls/include/mbedtls/config.h > mbedtls_config.h
 	cp mbedtls_config.h mbedtls/include/mbedtls/config.h
 	make -C mbedtls/library LDFLAGS="$(MBEDTLS_LDFLAGS)" CFLAGS="$(MBEDTLS_CFLAGS)"
