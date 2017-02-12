@@ -6,7 +6,7 @@ return {
     {'.o', 'mbedtls/library/libmbedcrypto.a' },
   },
   luaopen = {
-    {'lz4', 'luaopen_lem_mbedtls_core'},
+    {'lem.mbedtls.core', 'luaopen_lem_mbedtls_core'},
   },
   lua_files ={{"extra", "lem/mbedtls.lua"}}
 }

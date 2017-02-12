@@ -11,7 +11,7 @@ CFLAGS := -g -O2 -Wall -Wdeclaration-after-statement -fPIC  \
 					-I./mbedtls/include  \
        $(shell \
          PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) \
-         $(PKG_CONFIG) --cflags lem)
+         $(PKG_CONFIG) --cflags lem) $(LEM_INCDIR)
 
 LDFLAGS := -nostartfiles -shared -L./mbedtls/library -lmbedtls -lmbedx509 -lmbedcrypto
 
