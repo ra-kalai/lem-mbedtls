@@ -31,13 +31,9 @@ local tcp_connect = io.tcp.connect
 local tls_config_mt = {}
 tls_config_mt.__index = tls_config_mt
 
-function new_tls_config(conf)
-  local o = {}
-
-  conf.drbg = mbedtls_core.new_drbg()
-  o.config_info = conf
-
+function merge_file_in_attr(conf)
   local rconf = {}
+
   for k, v in pairs(conf) do
     rconf[k] = v
     local m = k:match("([^_]*)_file")
@@ -50,6 +46,20 @@ function new_tls_config(conf)
         return nil, "could not load "..k, err
       end
     end
+  end
+
+  return rconf
+end
+
+function new_tls_config(conf)
+  local o = {}
+
+  local err, derr
+  conf.drbg = conf.drbg or mbedtls_core.new_drbg()
+  o.config_info, err, derr = merge_file_in_attr(conf)
+
+  if o.config_info == nil then
+    return nil, err, derr
   end
 
   o.config = mbedtls_core.new_conf(rconf)
@@ -186,4 +196,83 @@ function tls_config_mt:ssl_wrap_socket(socket, hostname)
   return setmetatable(o, wrapped_socket_mt)
 end
 
-return {new_tls_config=new_tls_config}
+function new_pkey(attr)
+  attr = attr or {}
+  attr.drbg = attr.drbg or mbedtls_core.new_drbg()
+  attr.type = attr.type or 'rsa'
+  attr.format = attr.format or 'pem'
+  attr.rsa_keysize = 2048
+  return mbedtls_core.new_pkey(attr)
+end
+
+function new_cert(attr)
+  local attr = merge_file_in_attr(attr)
+  attr.drbg = attr.drbg or mbedtls_core.new_drbg()
+  return mbedtls_core.new_cert(attr)
+end
+
+-- need to be less or more equivalent to x509/cert_write \
+-- selfsign=1 issuer_key=ca-key.pem \
+-- issuer_name=CN=LEMMbedTLS,O=LEMMbedTLS,C=FR        \
+-- not_before=20130101000000 not_after=20181231235959   \
+-- key_usage=key_cert_sign,crl_sign,key_encipherment \
+-- ns_cert_type=ssl_ca,object_signing,object_signing_ca \
+-- is_ca=1 max_pathlen=0 output_file=ca-cert.crt serial=9999
+function new_ca_crt(pkey, attr)
+  attr = attr or {}
+  attr.not_before = attr.not_before or string.format("%d", os.date('%Y')-1) .. "0101000000"
+  attr.not_after = attr.not_after   or string.format("%d", os.date('%Y')+9) .. "1231235959"
+
+  attr.serial = attr.serial or "9999"
+  attr.selfsign = attr.selfsign or 1
+  attr.issuer_name="CN=LEMMbedTLS,O=LEMMbedTLS,C=FR"
+
+  attr.issuer_key = pkey
+
+  -- '+' should be a fine replacement for '|' to stay compatible with lua5.1
+  -- as long as a flag only appear 1 time..
+
+  attr.key_usage = mbedtls_core.opt_key_usage_map.key_cert_sign +
+                   mbedtls_core.opt_key_usage_map.crl_sign +
+                   mbedtls_core.opt_key_usage_map.key_encipherment
+  attr.ns_cert_type = mbedtls_core.opt_ns_cert_type_map.ssl_ca +
+                      mbedtls_core.opt_ns_cert_type_map.object_signing +
+                      mbedtls_core.opt_ns_cert_type_map.object_signing_ca 
+  attr.is_ca=1
+  attr.max_pathlen= attr.max_pathlen or 0
+  return new_cert(attr)
+end
+
+-- need to be less or more equivalent to x509/cert_write \
+-- issuer_key=ca-key.pem subject_key=key.pem \
+-- issuer_name=CN=LEMMbedTLS,O=LEMMbedTLS,C=FR        \
+-- subject_name=CN=localhost,O=RA,C=FR     \
+-- not_before=20130101000000 not_after=20181231235959   \
+-- output_file=cert.crt ns_cert_type=ssl_server serial=9999
+function new_signed_crt(ca_key, ca_crt, attr)
+  attr = attr or {}
+
+  if attr.subject_name == nil then
+    return nil, "missing a subject_name attribute ie: CN=localhost,O=Bla,C=FR"
+  end
+
+  if attr.subject_key == nil then
+    return nil, "missing a subject_key attribute"
+  end
+
+  attr.not_before = attr.not_before or string.format("%d", os.date('%Y')-1) .. "0101000000"
+  attr.not_after = attr.not_after   or string.format("%d", os.date('%Y')+9) .. "1231235959"
+
+  attr.issuer_crt = ca_crt
+  attr.issuer_key = ca_key
+  attr.ns_cert_type = attr.ns_cert_type or mbedtls_core.opt_ns_cert_type_map.ssl_server
+  attr.serial = attr.serial or "9999"
+  return new_cert(attr)
+end
+
+
+return {new_tls_config=new_tls_config,
+        new_pkey=new_pkey,
+        new_drbg=mbedtls_core.new_drbg,
+        new_ca_crt=new_ca_crt,
+        new_signed_crt=new_signed_crt}

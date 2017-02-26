@@ -267,7 +267,7 @@ int lem_mbedtls_new_conf(lua_State *T) {
       }
     }
     if (pem) {
-      //ret = mbedtls_x509_crt_parse_file(&conf->srvcert, pem_file);
+      /* ret = mbedtls_x509_crt_parse_file(&conf->srvcert, pem_file); */
       ret = mbedtls_x509_crt_parse(&conf->srvcert, (unsigned char*)pem, pem_len+1);
       if (ret != 0) {
         char *err;
@@ -524,7 +524,10 @@ static void ssl_forward_cb(EV_P_ ev_io *w, int revents) {
 
     if (len <= 0) {
       event->status = IDLE_REARM_SSL_WATCHER;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
       ev_idle_init(&event->idle, idle_restart_rssl_watcher);
+#pragma GCC diagnostic pop
       ev_idle_start(EV_A_ &event->idle);
       ev_io_stop(EV_A_ w);
       return ;
@@ -603,7 +606,10 @@ static void unix_forward_cb(EV_P_ ev_io *w, int revents) {
 
     if (len <= 0) {
       event->status = IDLE_REARM_UNIX_WATCHER;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
       ev_idle_init(&event->idle, idle_restart_unix_watcher);
+#pragma GCC diagnostic pop
       ev_idle_start(EV_A_ &event->idle);
       ev_io_stop(EV_A_ w);
       return ;
@@ -698,12 +704,14 @@ void lem_mbedtls_ssl_wrap_socket_reap(struct lem_async *a) {
     return ;
   }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
   ev_io_init(&event->rssl, ssl_forward_cb, task->fd, EV_READ);
   ev_io_init(&event->wssl, ssl_write_cb, task->fd, EV_WRITE);
 
   ev_io_init(&event->runix, unix_forward_cb, task->socket_vector[0], EV_READ);
   ev_io_init(&event->wunix, unix_write_cb, task->socket_vector[0], EV_WRITE);
-
+#pragma GCC diagnostic pop
 
   ev_io_start(LEM_ &event->rssl);
   ev_io_start(LEM_ &event->runix);
@@ -1003,12 +1011,12 @@ static int lem_mbedtls_new_cert(lua_State *T) {
   lua_getfield(T, 1, "drbg");
   lua_getfield(T, 1, "serial");
   lua_getfield(T, 1, "selfsign");
-  lua_getfield(T, 1, "issuer_crt_file");
-  lua_getfield(T, 1, "csr_file");
+  lua_getfield(T, 1, "issuer_crt");
+  lua_getfield(T, 1, "csr");
   lua_getfield(T, 1, "subject_pwd");
-  lua_getfield(T, 1, "subject_key_file");
+  lua_getfield(T, 1, "subject_key");
   lua_getfield(T, 1, "issuer_pwd");
-  lua_getfield(T, 1, "issuer_key_file");
+  lua_getfield(T, 1, "issuer_key");
   lua_getfield(T, 1, "subject_name");
   lua_getfield(T, 1, "issuer_name");
   lua_getfield(T, 1, "not_before");
@@ -1025,12 +1033,18 @@ static int lem_mbedtls_new_cert(lua_State *T) {
     char subject_name_buf[256];
     const char *c_subject_name;
     const char *c_issuer_name;
-    const char *c_issuer_crt_file;
+    const char *c_issuer_crt;
+    size_t c_issuer_crt_len = 0;
     const char *c_subject_pwd;
-    const char *c_csr_file;
-    const char *c_subject_key_file;
+    size_t c_subject_pwd_len = 0;
+    const char *c_csr;
+    size_t c_csr_len = 0;
+    const char *c_subject_key;
+    size_t c_subject_key_len = 0;
     const char *c_issuer_pwd;
-    const char *c_issuer_key_file;
+    size_t c_issuer_pwd_len = 0;
+    const char *c_issuer_key;
+    size_t c_issuer_key_len = 0;
     const char *c_not_before = "20010101000000";
     const char *c_not_after = "20301231235959";
     const char *c_serial;
@@ -1058,11 +1072,11 @@ static int lem_mbedtls_new_cert(lua_State *T) {
 
     c_selfsign = lua_tointeger(T, 4);
 
-    c_issuer_crt_file = lua_tostring(T, 5);
+    c_issuer_crt = lua_tolstring(T, 5, &c_issuer_crt_len);
 
-    if (!c_selfsign && c_issuer_crt_file) {
-      if ((ret = mbedtls_x509_crt_parse_file(&issuer_crt, c_issuer_crt_file)) != 0) {
-        char *err = heap_err_msg("failed - issuer_crt_file - mbedtls_x509_crt_parse_file returned -0x%04x", -ret);
+    if (!c_selfsign && c_issuer_crt) {
+      if ((ret = mbedtls_x509_crt_parse(&issuer_crt, (unsigned char *)c_issuer_crt, c_issuer_crt_len+1)) != 0) {
+        char *err = heap_err_msg("failed - issuer_crt_file - mbedtls_x509_crt_parse returned -0x%04x", -ret);
         lua_pushnil(T);
         lua_pushstring(T, err);
         free(err);
@@ -1080,11 +1094,11 @@ static int lem_mbedtls_new_cert(lua_State *T) {
       c_issuer_name = issuer_name_buf;
     }
 
-    c_csr_file = lua_tostring(T, 6);
+    c_csr = lua_tolstring(T, 6, &c_csr_len);
 
-    if (!c_selfsign && c_csr_file) {
-      if ((ret = mbedtls_x509_csr_parse_file(&csr, c_csr_file)) != 0) {
-        char *err = heap_err_msg("failed - mbedtls_x509_csr_parse_file returned -0x%04x", -ret);
+    if (!c_selfsign && c_csr) {
+      if ((ret = mbedtls_x509_csr_parse(&csr, (unsigned char*)c_csr, c_csr_len+1)) != 0) {
+        char *err = heap_err_msg("failed - mbedtls_x509_csr_parse returned -0x%04x", -ret);
         lua_pushnil(T);
         lua_pushstring(T, err);
         free(err);
@@ -1104,18 +1118,21 @@ static int lem_mbedtls_new_cert(lua_State *T) {
       subject_key = &csr.pk;
     }
 
-    c_subject_pwd = lua_tostring(T, 7);
+    c_subject_pwd = lua_tolstring(T, 7, &c_subject_pwd_len);
 
     if (c_subject_pwd == NULL) {
       c_subject_pwd = "";
+      c_subject_pwd_len = 0;
+    } else {
+      c_subject_pwd_len += 1;
     }
 
-    c_subject_key_file = lua_tostring(T, 8);
+    c_subject_key = lua_tolstring(T, 8, &c_subject_key_len);
 
-    if (!c_selfsign && c_subject_key_file) {
-      ret = mbedtls_pk_parse_keyfile(&loaded_subject_key, c_subject_key_file, c_subject_pwd);
+    if (!c_selfsign && c_subject_key) {
+      ret = mbedtls_pk_parse_key(&loaded_subject_key, (unsigned char*)c_subject_key, c_subject_key_len+1, (unsigned char*)c_subject_pwd, c_subject_pwd_len);
       if (ret != 0) {
-        char *err = heap_err_msg("failed - mbedtls_pk_parse_keyfile returned -0x%04x", -ret);
+        char *err = heap_err_msg("failed - c_subject_key - mbedtls_pk_parse_keyfile returned -0x%04x", -ret);
         lua_pushnil(T);
         lua_pushstring(T, err);
         free(err);
@@ -1123,18 +1140,21 @@ static int lem_mbedtls_new_cert(lua_State *T) {
       }
     }
 
-    c_issuer_pwd = lua_tostring(T, 9);
+    c_issuer_pwd = lua_tolstring(T, 9, &c_issuer_pwd_len);
 
     if (c_issuer_pwd == NULL) {
       c_issuer_pwd = "";
+      c_issuer_pwd_len = 0;
+    } else {
+      c_issuer_pwd_len += 1;
     }
 
-    c_issuer_key_file = lua_tostring(T, 10);
+    c_issuer_key = lua_tolstring(T, 10, &c_issuer_key_len);
 
-    if (c_issuer_key_file) {
-      ret = mbedtls_pk_parse_keyfile(&loaded_issuer_key, c_issuer_key_file, c_issuer_pwd);
+    if (c_issuer_key) {
+      ret = mbedtls_pk_parse_key(&loaded_issuer_key, (unsigned char*)c_issuer_key, c_issuer_key_len+1, (unsigned char*)c_issuer_pwd, c_issuer_pwd_len);
       if (ret != 0) {
-        char *err = heap_err_msg("failed - mbedtls_pk_parse_keyfile returned -x%04x", -ret);
+        char *err = heap_err_msg("failed - issuer_key - mbedtls_pk_parse_keyfile returned -x%04x", -ret);
         lua_pushnil(T);
         lua_pushstring(T, err);
         free(err);
@@ -1176,7 +1196,7 @@ static int lem_mbedtls_new_cert(lua_State *T) {
     c_key_usage = lua_tointeger(T, 17);
     c_ns_cert_type = lua_tointeger(T, 18);
 
-    if (c_issuer_crt_file) {
+    if (c_issuer_crt) {
       if (!mbedtls_pk_can_do(&issuer_crt.pk, MBEDTLS_PK_RSA) ||
           mbedtls_mpi_cmp_mpi(&mbedtls_pk_rsa(issuer_crt.pk)->N,
             &mbedtls_pk_rsa(*issuer_key)->N) != 0 ||
@@ -1203,7 +1223,7 @@ static int lem_mbedtls_new_cert(lua_State *T) {
     mbedtls_x509write_crt_set_issuer_key(&crt, issuer_key);
 
 
-    // write the crt file
+    /* write the crt file */
     if ((ret = mbedtls_x509write_crt_set_subject_name(&crt, c_subject_name)) != 0) {
       char *err = heap_err_msg("failed - mbedtls_x509write_crt_set_subject_name returned -0x%04x", -ret);
       lua_pushnil(T);
@@ -1379,14 +1399,14 @@ int luaopen_lem_mbedtls_core(lua_State *L) {
     lua_pushinteger(L, opt_key_usage_list[i].v);
     lua_setfield(L, -2, opt_key_usage_list[i].key);
   }
-  lua_setfield(L, -2, "opt_key_usage_list");
+  lua_setfield(L, -2, "opt_key_usage_map");
 
   lua_newtable(L);
   for (i=0;i<COUNT_OF(opt_ns_cert_type_list);i++) {
     lua_pushinteger(L, opt_ns_cert_type_list[i].v);
-    lua_setfield(L, -2, opt_key_usage_list[i].key);
+    lua_setfield(L, -2, opt_ns_cert_type_list[i].key);
   }
-  lua_setfield(L, -2, "opt_ns_cert_type_list");
+  lua_setfield(L, -2, "opt_ns_cert_type_map");
 #undef COUNT_OF
 
   return 1;
