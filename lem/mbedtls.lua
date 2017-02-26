@@ -177,6 +177,12 @@ function tls_config_mt:ssl_wrap_socket(socket, hostname)
     ssl_config=self
   }
 
+  if _VERSION == 'Lua 5.1' then
+     local prox = newproxy(true)
+     getmetatable(prox).__gc = function() wrapped_socket_mt.__gc(o) end
+     o.gc_mt_hack = true
+  end
+
   return setmetatable(o, wrapped_socket_mt)
 end
 

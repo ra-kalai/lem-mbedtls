@@ -1286,7 +1286,32 @@ int lem_mbedtls_debug_set_threshold(lua_State *L) {
   return 0;
 }
 
+static struct const_list {
+  char *key;
+  int v;
+} opt_key_usage_list[] =
+{
+  {"digital_signature", MBEDTLS_X509_KU_DIGITAL_SIGNATURE},
+  {"non_repudiation", MBEDTLS_X509_KU_NON_REPUDIATION},
+  {"key_encipherment", MBEDTLS_X509_KU_KEY_ENCIPHERMENT},
+  {"data_encipherment", MBEDTLS_X509_KU_DATA_ENCIPHERMENT},
+  {"key_agreement", MBEDTLS_X509_KU_KEY_AGREEMENT},
+  {"key_cert_sign", MBEDTLS_X509_KU_KEY_CERT_SIGN},
+  {"crl_sign", MBEDTLS_X509_KU_CRL_SIGN},
+},
+ opt_ns_cert_type_list[] = {
+  {"ssl_client", MBEDTLS_X509_NS_CERT_TYPE_SSL_CLIENT},
+  {"ssl_server", MBEDTLS_X509_NS_CERT_TYPE_SSL_SERVER},
+  {"email", MBEDTLS_X509_NS_CERT_TYPE_EMAIL},
+  {"object_signing", MBEDTLS_X509_NS_CERT_TYPE_OBJECT_SIGNING},
+  {"ssl_ca", MBEDTLS_X509_NS_CERT_TYPE_SSL_CA},
+  {"email_ca", MBEDTLS_X509_NS_CERT_TYPE_EMAIL_CA},
+  {"object_signing_ca", MBEDTLS_X509_NS_CERT_TYPE_OBJECT_SIGNING_CA},
+} ;
+
 int luaopen_lem_mbedtls_core(lua_State *L) {
+  int i;
+
   /* metatable for drbg object */
   luaL_newmetatable(L, g_mbedtls_drbg_mt);
 
@@ -1344,6 +1369,25 @@ int luaopen_lem_mbedtls_core(lua_State *L) {
 
   lua_pushcfunction(L, lem_mbedtls_debug_set_threshold);
   lua_setfield(L, -2, "mbedtls_debug_set_threshold");
+
+#ifndef COUNT_OF
+#define COUNT_OF(x) (sizeof(x)/sizeof(x[0]))
+#endif
+
+  lua_newtable(L);
+  for (i=0;i<COUNT_OF(opt_key_usage_list);i++) {
+    lua_pushinteger(L, opt_key_usage_list[i].v);
+    lua_setfield(L, -2, opt_key_usage_list[i].key);
+  }
+  lua_setfield(L, -2, "opt_key_usage_list");
+
+  lua_newtable(L);
+  for (i=0;i<COUNT_OF(opt_ns_cert_type_list);i++) {
+    lua_pushinteger(L, opt_ns_cert_type_list[i].v);
+    lua_setfield(L, -2, opt_key_usage_list[i].key);
+  }
+  lua_setfield(L, -2, "opt_ns_cert_type_list");
+#undef COUNT_OF
 
   return 1;
 }
