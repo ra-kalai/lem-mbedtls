@@ -62,7 +62,7 @@ function new_tls_config(conf)
     return nil, err, derr
   end
 
-  o.config = mbedtls_core.new_conf(rconf)
+  o.config = mbedtls_core.new_conf(o.config_info)
 
   o.free_context_list = {}
   o.context_map = {}
