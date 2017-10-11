@@ -671,13 +671,13 @@ void lem_mbedtls_ssl_wrap_socket_work(struct lem_async *a) {
     return ;
   }
 
-  if (fcntl(task->socket_vector[0], F_SETFL, O_NONBLOCK) == -1) {
+  if (fcntl(task->socket_vector[0], F_SETFL, O_NONBLOCK|FD_CLOEXEC) == -1) {
     task->err = -errno;
     task->errmsg = heap_err_msg("failed fcntl socket[0]: %s", strerror(errno));
     return ;
   }
 
-  if (fcntl(task->socket_vector[1], F_SETFL, O_NONBLOCK) == -1) {
+  if (fcntl(task->socket_vector[1], F_SETFL, O_NONBLOCK|FD_CLOEXEC) == -1) {
     task->err = -errno;
     task->errmsg = heap_err_msg("failed fcntl: socket[1]: %s", strerror(errno));
     return ;
